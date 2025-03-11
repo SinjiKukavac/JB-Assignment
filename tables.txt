@@ -1,0 +1,27 @@
+--------------------------------------------
+CREATE TABLE adyen_transactions (
+    MERCHANT_ACCOUNT TEXT,
+    BATCH_NUMBER INT,
+    ORDER_REF TEXT,
+    TYPE TEXT,
+    DATE DATE,
+    NET DOUBLE PRECISION,
+    FEE DOUBLE PRECISION,
+    GROSS DOUBLE PRECISION
+);
+
+CREATE INDEX idx_adyen_transactions_merchant_batch
+ON adyen_transactions (merchant_account, batch_number);
+-----------------------------------
+CREATE TABLE netsuite_transactions (
+    MERCHANT_ACCOUNT TEXT,
+    BATCH_NUMBER INT,
+    TRANDATE DATE,
+    TRANSACTION_TYPE TEXT,
+    AMOUNT DOUBLE PRECISION,    
+    ORDER_REF TEXT
+);
+
+CREATE INDEX idx_netsuite_transactions_merchant_batch
+ON netsuite_transactions (merchant_account, batch_number);
+-----------------------------------

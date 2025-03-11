@@ -1,0 +1,115 @@
+----------- Task table(with transaction type):
+with net_tr as (
+    select merchant_account, batch_number, round(sum(amount)::numeric, 2) amount
+	  from netsuite_transactions
+	where transaction_type= 'Payment'
+	 group by merchant_account, batch_number),
+	
+	adyen_tr as (
+		select merchant_account, batch_number, sum(gross) amount
+		  from adyen_transactions
+	     where type = 'Settled'
+		 group by merchant_account, batch_number )
+		 
+select coalesce(n.merchant_account, a.merchant_account) "Merchant Account",
+	   coalesce(n.batch_number, a.batch_number) "Batch Number",
+	   coalesce(n.amount, 0) "NetSuite",
+	   coalesce(a.amount, 0) "Payment Gateway",
+	   coalesce(n.amount, 0) - coalesce(a.amount, 0) "Difference"	
+  from net_tr n 
+  full outer join adyen_tr a 
+       on n.merchant_account = a.merchant_account
+       and n.batch_number = a.batch_number
+ order by 1, 2 nulls first;
+--------------------------------------------------- in progress
+select sum(amount), tr.MERCHANT_ACCOUNT
+from netsuite.TRANSACTIONS tr
+join netsuite.TRANSACTION_LINES li on li.TRANSACTION_ID = tr.TRANSACTION_ID
+join netsuite.accounts acc on acc.ACCOUNT_ID = li.ACCOUNT_ID
+where tr.BATCH_NUMBER is null and  tr.MERCHANT_ACCOUNT = 'JetBrainsAmericasUSD' and
+ acc.ACCOUNTNUMBER in (315700 , 315710, 315720, 315800, 548201) 
+--tr.TRANSACTION_TYPE = 'Payment' and
+--and li.TRANSACTION_LINE_ID = 1
+group by tr.MERCHANT_ACCOUNT
+order by 1
+-------------------------------------------
+--provjeriti o cemu se radi
+select * --row_number() over (partition by order_ref order by trandate) t
+	from netsuite_transactions 
+	where batch_number = 352 and merchant_account = 'JetBrainsEUR'
+	and order_ref = 'A000044482';
+
+select * from adyen_transactions where order_ref = 'A000044482';
+	
+	--zasto imamo razliku, sta treba da se izbaci
+---------------------------------------------------
+select a.order_ref, n.order_ref, a.batch_number, a.merchant_account
+	from adyen_transactions a 
+	left join netsuite_transactions n 
+	on n.merchant_account = a.merchant_account and n.batch_number=a.batch_number
+	where a.batch_number = 354 and a.merchant_account = 'JetBrainsEUR'
+
+	;
+		
+-------------------------------- wanted to check order_ref diff for batch number and account, 354 jetbrainsEUR
+select a.order_ref, a.batch_number, a.merchant_account
+	from adyen_transactions a 
+	where a.batch_number = 354 and a.merchant_account = 'JetBrainsEUR'
+and not exists 
+	(
+	select 1 
+	from netsuite_transactions n
+	where n.batch_number = a.batch_number and a.merchant_account = n.merchant_account and n.order_ref = a.order_ref
+	)
+--------------------------------- total sum per ored ref
+select order_ref, sum_order  from 
+(select distinct a.order_ref, a.batch_number, a.merchant_account, a.amount,
+	sum(amount) over (partition by order_ref) sum_order,
+	row_number() over (partition by order_ref order by batch_number , amount ) t
+  from netsuite_transactions a 
+ where a.batch_number = 352 and a.merchant_account = 'JetBrainsEUR' and a.transaction_type = 'Payment'
+--and a.order_ref = 'E000012449'
+)
+where t = 1
+order by 1
+--------------------------------------------------------
+SSMS:
+/*
+select tr.MERCHANT_ACCOUNT,  sum(amount)
+from dea.netsuite.TRANSACTIONS tr
+join dea.netsuite.TRANSACTION_LINES li on li.TRANSACTION_ID = tr.TRANSACTION_ID
+join dea.netsuite.accounts acc on acc.ACCOUNT_ID = li.ACCOUNT_ID
+where li.TRANSACTION_LINE_ID = 1  and
+ acc.ACCOUNTNUMBER in (315700 , 315710, 315720, 315800, 548201) and
+ tr.MERCHANT_ACCOUNT = 'JetBrainsAmericasUSD' and 
+tr.BATCH_NUMBER is null 
+group by tr.MERCHANT_ACCOUNT
+order by sum(amount);
+*/
+select distinct tr.TRANDATE
+from netsuite.TRANSACTIONS tr
+join netsuite.TRANSACTION_LINES li on li.TRANSACTION_ID = tr.TRANSACTION_ID
+join netsuite.accounts acc on acc.ACCOUNT_ID = li.ACCOUNT_ID
+where tr.BATCH_NUMBER = 350 and tr.MERCHANT_ACCOUNT = 'JetBrainsAmericasUSD' and tr.ORDER_REF = 'A000000003' and 
+ acc.ACCOUNTNUMBER in (315700 , 315710, 315720, 315800, 548201) 
+ --and tr.TRANSACTION_TYPE = 'Payment' 
+--and li.TRANSACTION_LINE_ID = 1
+
+
+;
+-------------------------------
+select * --row_number() over (partition by order_ref order by trandate) t
+	from netsuite_transactions 
+	where batch_number = 352 and merchant_account = 'JetBrainsEUR'
+	and order_ref = 'A000044482';
+
+select * from adyen_transactions where order_ref = 'A000044482';
+	----------------------------
+	
+select a.order_ref, n.order_ref, a.batch_number, a.merchant_account
+	from adyen_transactions a 
+	left join netsuite_transactions n 
+	on n.merchant_account = a.merchant_account and n.batch_number=a.batch_number
+	where a.batch_number = 354 and a.merchant_account = 'JetBrainsEUR'
+
+	;
